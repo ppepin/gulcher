@@ -6,6 +6,25 @@ from gulcher.models import EventRecord
 from gulcher.utils import DEFAULT_TIMEZONE, build_uid
 
 
+def dedupe_events(events: list[EventRecord]) -> list[EventRecord]:
+    deduped_events: list[EventRecord] = []
+    seen_keys: set[tuple[str, str, str | None]] = set()
+
+    for event in events:
+        key = (
+            event["summary"].strip().lower(),
+            event["start_at"].astimezone(DEFAULT_TIMEZONE).isoformat(),
+            event["location"].strip().lower() if event["location"] else None,
+        )
+        if key in seen_keys:
+            continue
+
+        seen_keys.add(key)
+        deduped_events.append(event)
+
+    return deduped_events
+
+
 def build_calendar(events: list[EventRecord]) -> Calendar:
     calendar = Calendar()
     calendar.add("prodid", "-//gulcher//events//EN")
