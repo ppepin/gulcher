@@ -111,14 +111,16 @@ def normalize_state_farm_arena_events(payloads: list[Any]) -> list[dict[str, Any
 
 def build_calendar(events: list[dict[str, Any]]) -> Calendar:
     calendar = Calendar()
+    calendar.add("prodid", "-//gulcher//events//EN")
+    calendar.add("version", "2.0")
     generated_at = datetime.now(UTC)
 
     for item in sorted(events, key=lambda event: event["start_at"]):
         event = Event()
         event.add("summary", item["summary"])
-        event.add("dtstart", item["start_at"])
+        event.add("dtstart", item["start_at"].astimezone(UTC))
         if item["end_at"] is not None:
-            event.add("dtend", item["end_at"])
+            event.add("dtend", item["end_at"].astimezone(UTC))
         event.add("dtstamp", generated_at)
         event.add("uid", build_uid(item["source"], item["url"], item["start_at"]))
 
