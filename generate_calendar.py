@@ -2,6 +2,7 @@ import hashlib
 import json
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import urljoin
 from zoneinfo import ZoneInfo
 
 import requests
@@ -11,13 +12,33 @@ from icalendar import Calendar, Event
 
 OUTPUT_PATH = "gulcher-events.ics"
 DEFAULT_TIMEZONE = ZoneInfo("America/New_York")
-STATE_FARM_ARENA_EVENTS_URL = "https://www.statefarmarena.com/events/index/36"
+STATE_FARM_ARENA_LISTING_URL = "https://www.statefarmarena.com/events/index/4"
 
 
 def fetch_html(url: str) -> str:
     response = requests.get(url, timeout=30)
     response.raise_for_status()
     return response.text
+
+
+def extract_state_farm_arena_detail_urls(html: str) -> list[str]:
+    soup = BeautifulSoup(html, "html.parser")
+    urls: list[str] = []
+    seen: set[str] = set()
+
+    for link in soup.find_all("a", href=True):
+        href = link["href"].strip()
+        if "/events/detail/" not in href:
+            continue
+
+        event_url = urljoin(STATE_FARM_ARENA_LISTING_URL, href)
+        if event_url in seen:
+            continue
+
+        seen.add(event_url)
+        urls.append(event_url)
+
+    return urls
 
 
 def extract_json_ld(html: str) -> list[Any]:
@@ -85,7 +106,7 @@ def normalize_state_farm_arena_events(payloads: list[Any]) -> list[dict[str, Any
             start_at = parse_event_datetime(start_date)
             end_date = raw_event.get("endDate")
             end_at = parse_event_datetime(end_date) if end_date else None
-            event_url = raw_event.get("url") or STATE_FARM_ARENA_EVENTS_URL
+            event_url = raw_event.get("url") or STATE_FARM_ARENA_LISTING_URL
 
             location_name = None
             location = raw_event.get("location")
@@ -137,9 +158,21 @@ def build_calendar(events: list[dict[str, Any]]) -> Calendar:
 
 
 def main() -> None:
-    html = fetch_html(STATE_FARM_ARENA_EVENTS_URL)
-    payloads = extract_json_ld(html)
-    events = normalize_state_farm_arena_events(payloads)
+    listing_html = fetch_html(STATE_FARM_ARENA_LISTING_URL)
+    detail_urls = extract_state_farm_arena_detail_urls(listing_html)
+    events: list[dict[str, Any]] = []
+
+    for detail_url in detail_urls:
+        detail_html = fetch_html(detail_url)
+        payloads = extract_json_ld(detail_html)
+        detail_events = normalize_state_farm_arena_events(payloads)
+
+        for item in detail_events:
+            if item["url"] == STATE_FARM_ARENA_LISTING_URL:
+                item["url"] = detail_url
+
+        events.extend(detail_events)
+
     calendar = build_calendar(events)
 
     with open(OUTPUT_PATH, "wb") as f:
