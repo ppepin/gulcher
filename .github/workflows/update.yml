@@ -1,4 +1,4 @@
-name: Update Calendar
+name: Gulcher Feed Update
 
 on:
   schedule:
@@ -6,24 +6,34 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  update:
     runs-on: ubuntu-latest
 
     steps:
+      # Step 1: Checkout code
       - uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
         with:
-          python-version: 3.x
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run script
+      # Step 2: Setup Python
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      # Step 3: Install dependencies (if needed)
+      - name: Install Python packages
+        run: pip install requests beautifulsoup4
+
+      # Step 4: Run the calendar generator
+      - name: Generate ICS feed
         run: python generate_calendar.py
 
-      - name: Commit updated ICS
+      # Step 5: Commit & push only if changes exist
+      - name: Commit and push updates
         run: |
-          git config --global user.name "bot"
-          git config --global user.email "bot@example.com"
-          git add gulcher.ics
-          git commit -m "Update calendar" || echo "No changes"
-          git push
+          git config user.name "gulcher-bot"
+          git config user.email "bot@gulcher.local"
+          git add atlanta-traffic.ics
+          # Only commit if there are changes
+          git diff --cached --quiet || git commit -m "Update ICS feed"
+          git push origin HEAD:main
