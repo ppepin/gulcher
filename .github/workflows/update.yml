@@ -30,7 +30,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: python3 -m pip install icalendar
+        run: python3 -m pip install -r requirements.txt
 
       - name: Generate ICS feed
         run: python3 generate_calendar.py
