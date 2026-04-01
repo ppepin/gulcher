@@ -26,5 +26,5 @@ ics = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//ATL Traffic//EN\n"
 ics += "\n".join(events)
 ics += "\nEND:VCALENDAR"
 
-with open("gulcher.ics", "w") as f:
+with open("gulcher-events.ics", "w") as f:
     f.write(ics)
