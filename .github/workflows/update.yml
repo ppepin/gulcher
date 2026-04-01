@@ -33,7 +33,7 @@ jobs:
         run: |
           git config user.name "gulcher-bot"
           git config user.email "bot@gulcher.local"
-          git add atlanta-traffic.ics
+          git add gulcher-traffic.ics
           # Only commit if there are changes
           git diff --cached --quiet || git commit -m "Update ICS feed"
           git push origin HEAD:main
