@@ -1,0 +1,29 @@
+name: Update Calendar
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"   # every 6 hours
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.x
+
+      - name: Run script
+        run: python generate_calendar.py
+
+      - name: Commit updated ICS
+        run: |
+          git config --global user.name "bot"
+          git config --global user.email "bot@example.com"
+          git add gulcher.ics
+          git commit -m "Update calendar" || echo "No changes"
+          git push
