@@ -8,6 +8,12 @@ from gulcher.utils import extract_json_ld, fetch_html, iter_event_nodes, parse_e
 
 
 STATE_FARM_ARENA_LISTING_URL = "https://www.statefarmarena.com/events/index/4"
+STATE_FARM_ARENA_SEED_URLS = [
+    STATE_FARM_ARENA_LISTING_URL,
+    "https://www.statefarmarena.com/",
+    "https://www.statefarmarena.com/index.php",
+    "https://www.statefarmarena.com/?lang=en",
+]
 
 
 def extract_state_farm_arena_detail_urls(html: str) -> list[str]:
@@ -87,10 +93,11 @@ def normalize_state_farm_arena_events(payloads: list[object]) -> list[EventRecor
 
 
 def fetch_events() -> list[EventRecord]:
-    pending_listing_urls = [STATE_FARM_ARENA_LISTING_URL]
+    pending_listing_urls = list(STATE_FARM_ARENA_SEED_URLS)
     seen_listing_urls: set[str] = set()
     detail_urls: list[str] = []
     seen_detail_urls: set[str] = set()
+    fetched_listing = False
 
     while pending_listing_urls:
         listing_url = pending_listing_urls.pop(0)
@@ -98,7 +105,12 @@ def fetch_events() -> list[EventRecord]:
             continue
 
         seen_listing_urls.add(listing_url)
-        listing_html = fetch_html(listing_url)
+        try:
+            listing_html = fetch_html(listing_url)
+        except Exception:
+            continue
+
+        fetched_listing = True
 
         for next_listing_url in extract_state_farm_arena_listing_urls(listing_html):
             if next_listing_url not in seen_listing_urls and next_listing_url not in pending_listing_urls:
@@ -111,11 +123,18 @@ def fetch_events() -> list[EventRecord]:
             seen_detail_urls.add(detail_url)
             detail_urls.append(detail_url)
 
+    if not fetched_listing:
+        raise RuntimeError("unable to fetch any State Farm Arena listing pages")
+
     events: list[EventRecord] = []
     seen_event_keys: set[tuple[str, datetime]] = set()
 
     for detail_url in detail_urls:
-        detail_html = fetch_html(detail_url)
+        try:
+            detail_html = fetch_html(detail_url)
+        except Exception:
+            continue
+
         payloads = extract_json_ld(detail_html)
         detail_events = normalize_state_farm_arena_events(payloads)
 
