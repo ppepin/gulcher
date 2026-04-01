@@ -10,6 +10,15 @@ from bs4 import BeautifulSoup
 
 
 DEFAULT_TIMEZONE = ZoneInfo("America/New_York")
+DEFAULT_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+}
 DATE_PATTERN = re.compile(
     r"(January|February|March|April|May|June|July|August|September|October|November|December) \d{1,2}, \d{4}"
 )
@@ -17,7 +26,7 @@ TIME_PATTERN = re.compile(r"\b\d{1,2}:\d{2}\s*[APap][Mm]\b|\bTBA\b")
 
 
 def fetch_html(url: str) -> str:
-    response = requests.get(url, timeout=30)
+    response = requests.get(url, headers=DEFAULT_HEADERS, timeout=30)
     response.raise_for_status()
     return response.text
 

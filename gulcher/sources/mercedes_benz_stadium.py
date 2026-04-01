@@ -7,6 +7,33 @@ from gulcher.utils import DATE_PATTERN, TIME_PATTERN, fetch_html, parse_event_da
 
 
 MERCEDES_BENZ_STADIUM_EVENTS_URL = "https://www.mercedesbenzstadium.com/events"
+GENERIC_SUMMARIES = {"event details", "details"}
+
+
+def extract_event_summary(event_block: object, link_text: str) -> str | None:
+    if getattr(event_block, "find_all", None):
+        for heading in event_block.find_all(["h1", "h2", "h3", "h4"]):
+            summary = heading.get_text(" ", strip=True).strip()
+            if summary and summary.lower() not in GENERIC_SUMMARIES:
+                return summary
+
+    cleaned_link_text = link_text.strip()
+    if cleaned_link_text and cleaned_link_text.lower() not in GENERIC_SUMMARIES:
+        return cleaned_link_text
+
+    return None
+
+
+def extract_detail_page_summary(detail_url: str) -> str | None:
+    detail_html = fetch_html(detail_url)
+    detail_soup = BeautifulSoup(detail_html, "html.parser")
+
+    for heading in detail_soup.find_all(["h1", "h2"]):
+        summary = heading.get_text(" ", strip=True).strip()
+        if summary and summary.lower() not in GENERIC_SUMMARIES:
+            return summary
+
+    return None
 
 
 def fetch_events() -> list[EventRecord]:
@@ -41,8 +68,9 @@ def fetch_events() -> list[EventRecord]:
         if event_block is None:
             continue
 
-        summary_node = event_block.find(["h2", "h3", "h4"])
-        summary = (summary_node.get_text(" ", strip=True) if summary_node else link.get_text(" ", strip=True)).strip()
+        summary = extract_event_summary(event_block, link.get_text(" ", strip=True))
+        if not summary:
+            summary = extract_detail_page_summary(detail_link)
         if not summary:
             continue
 
