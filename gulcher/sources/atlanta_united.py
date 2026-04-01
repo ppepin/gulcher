@@ -1,5 +1,4 @@
-import re
-
+from bs4 import BeautifulSoup
 from icalendar import Calendar
 
 from gulcher.models import EventRecord
@@ -11,15 +10,20 @@ ATLANTA_UNITED_LOCATION = "Mercedes-Benz Stadium"
 
 
 def extract_home_calendar_url(html: str) -> str | None:
-    patterns = [
-        r"Atlanta United \d{4} Home Matches.*?(https://images\.mlssoccer\.com/raw/upload/[^\"'\s]+\.ics)",
-        r"Home Matches.*?(https://images\.mlssoccer\.com/raw/upload/[^\"'\s]+\.ics)",
-    ]
+    soup = BeautifulSoup(html, "html.parser")
+    home_heading = soup.find(string=lambda text: isinstance(text, str) and "Home Matches" in text)
+    if home_heading is None:
+        return None
 
-    for pattern in patterns:
-        match = re.search(pattern, html, re.DOTALL)
-        if match:
-            return match.group(1).replace("%20", " ")
+    for link in home_heading.parent.find_all_next("a", href=True):
+        link_text = link.get_text(" ", strip=True)
+        href = link["href"].strip()
+        if "Away Matches" in link_text:
+            break
+        if "Sync to Apple" not in link_text and "Sync to Outlook" not in link_text:
+            continue
+        if href.endswith(".ics"):
+            return href.replace("%20", " ")
 
     return None
 
