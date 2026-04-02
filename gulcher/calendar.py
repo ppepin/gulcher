@@ -1,3 +1,4 @@
+import re
 from datetime import UTC, datetime
 
 from icalendar import Calendar, Event
@@ -6,23 +7,36 @@ from gulcher.models import EventRecord
 from gulcher.utils import DEFAULT_TIMEZONE, build_uid
 
 
+def normalize_summary(summary: str) -> str:
+    normalized = summary.lower().strip()
+    normalized = normalized.replace("&", " and ")
+    normalized = re.sub(r"[^a-z0-9]+", " ", normalized)
+    normalized = re.sub(r"\s+", " ", normalized)
+    return normalized.strip()
+
+
+def score_event(event: EventRecord) -> tuple[int, int, int]:
+    return (
+        1 if event["description"] else 0,
+        1 if event["end_at"] else 0,
+        1 if event["url"] else 0,
+    )
+
+
 def dedupe_events(events: list[EventRecord]) -> list[EventRecord]:
-    deduped_events: list[EventRecord] = []
-    seen_keys: set[tuple[str, str, str | None]] = set()
+    deduped_events: dict[tuple[str, str, str | None], EventRecord] = {}
 
     for event in events:
         key = (
-            event["summary"].strip().lower(),
-            event["start_at"].astimezone(DEFAULT_TIMEZONE).isoformat(),
+            normalize_summary(event["summary"]),
+            event["start_at"].astimezone(DEFAULT_TIMEZONE).date().isoformat(),
             event["location"].strip().lower() if event["location"] else None,
         )
-        if key in seen_keys:
-            continue
+        existing = deduped_events.get(key)
+        if existing is None or score_event(event) > score_event(existing):
+            deduped_events[key] = event
 
-        seen_keys.add(key)
-        deduped_events.append(event)
-
-    return deduped_events
+    return list(deduped_events.values())
 
 
 def build_calendar(events: list[EventRecord]) -> Calendar:

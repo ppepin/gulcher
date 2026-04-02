@@ -3,7 +3,6 @@ import sys
 from gulcher.calendar import build_calendar, dedupe_events
 from gulcher.sources.atlanta_united import fetch_events as fetch_atlanta_united_events
 from gulcher.sources.falcons import fetch_events as fetch_falcons_events
-from gulcher.sources.gwcc import fetch_events as fetch_gwcc_events
 from gulcher.sources.mercedes_benz_stadium import fetch_events as fetch_mercedes_benz_stadium_events
 from gulcher.sources.state_farm_arena import fetch_events as fetch_state_farm_arena_events
 
@@ -26,7 +25,6 @@ def main() -> None:
     extend_events(events, "mercedes_benz_stadium", fetch_mercedes_benz_stadium_events)
     extend_events(events, "atlanta_united", fetch_atlanta_united_events)
     extend_events(events, "atlanta_falcons", fetch_falcons_events)
-    extend_events(events, "gwcc", fetch_gwcc_events)
     deduped_events = dedupe_events(events)
     print(f"[info] total events before dedupe: {len(events)}", file=sys.stderr)
     print(f"[info] total events after dedupe: {len(deduped_events)}", file=sys.stderr)
