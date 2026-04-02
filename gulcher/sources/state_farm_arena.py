@@ -1,5 +1,6 @@
 from datetime import datetime
 import re
+import sys
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
@@ -226,6 +227,11 @@ def fetch_events() -> list[EventRecord]:
             seen_detail_urls.add(detail_url)
             detail_urls.append(detail_url)
 
+    print(
+        f"[info] state_farm_arena discovered {len(seen_listing_urls)} listing pages and {len(detail_urls)} detail urls",
+        file=sys.stderr,
+    )
+
     if not fetched_listing:
         raise RuntimeError("unable to fetch any State Farm Arena listing pages")
 
@@ -237,6 +243,10 @@ def fetch_events() -> list[EventRecord]:
             except Exception:
                 continue
             listing_events.extend(extract_state_farm_arena_listing_events(listing_html, listing_url))
+        print(
+            f"[info] state_farm_arena listing fallback produced {len(listing_events)} events",
+            file=sys.stderr,
+        )
         return listing_events
 
     events: list[EventRecord] = []
@@ -272,5 +282,10 @@ def fetch_events() -> list[EventRecord]:
         except Exception:
             continue
         listing_events.extend(extract_state_farm_arena_listing_events(listing_html, listing_url))
+
+    print(
+        f"[info] state_farm_arena detail pages produced 0 events, listing fallback produced {len(listing_events)} events",
+        file=sys.stderr,
+    )
 
     return listing_events
