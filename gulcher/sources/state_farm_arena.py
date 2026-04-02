@@ -235,19 +235,13 @@ def fetch_events() -> list[EventRecord]:
     if not fetched_listing:
         raise RuntimeError("unable to fetch any State Farm Arena listing pages")
 
-    if not detail_urls:
-        listing_events: list[EventRecord] = []
-        for listing_url in seen_listing_urls:
-            try:
-                listing_html = fetch_html(listing_url)
-            except Exception:
-                continue
-            listing_events.extend(extract_state_farm_arena_listing_events(listing_html, listing_url))
-        print(
-            f"[info] state_farm_arena listing fallback produced {len(listing_events)} events",
-            file=sys.stderr,
-        )
-        return listing_events
+    listing_events: list[EventRecord] = []
+    for listing_url in seen_listing_urls:
+        try:
+            listing_html = fetch_html(listing_url)
+        except Exception:
+            continue
+        listing_events.extend(extract_state_farm_arena_listing_events(listing_html, listing_url))
 
     events: list[EventRecord] = []
     seen_event_keys: set[tuple[str, datetime]] = set()
@@ -272,20 +266,23 @@ def fetch_events() -> list[EventRecord]:
             seen_event_keys.add(event_key)
             events.append(item)
 
-    if events:
-        return events
-
-    listing_events: list[EventRecord] = []
-    for listing_url in seen_listing_urls:
-        try:
-            listing_html = fetch_html(listing_url)
-        except Exception:
-            continue
-        listing_events.extend(extract_state_farm_arena_listing_events(listing_html, listing_url))
-
     print(
-        f"[info] state_farm_arena detail pages produced 0 events, listing fallback produced {len(listing_events)} events",
+        f"[info] state_farm_arena detail pages produced {len(events)} events, listing extraction produced {len(listing_events)} events",
         file=sys.stderr,
     )
 
-    return listing_events
+    merged_events = list(events)
+    merged_keys = {(event["summary"], event["start_at"].isoformat()) for event in events}
+    for item in listing_events:
+        event_key = (item["summary"], item["start_at"].isoformat())
+        if event_key in merged_keys:
+            continue
+        merged_keys.add(event_key)
+        merged_events.append(item)
+
+    print(
+        f"[info] state_farm_arena merged total {len(merged_events)} events",
+        file=sys.stderr,
+    )
+
+    return merged_events
