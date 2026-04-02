@@ -13,7 +13,9 @@ OUTPUT_PATH = "gulcher-events.ics"
 
 def extend_events(events: list, source_name: str, fetcher) -> None:
     try:
-        events.extend(fetcher())
+        fetched_events = fetcher()
+        events.extend(fetched_events)
+        print(f"[info] fetched {len(fetched_events)} events from {source_name}", file=sys.stderr)
     except Exception as exc:
         print(f"[warn] failed to fetch {source_name}: {exc}", file=sys.stderr)
 
@@ -25,7 +27,10 @@ def main() -> None:
     extend_events(events, "atlanta_united", fetch_atlanta_united_events)
     extend_events(events, "atlanta_falcons", fetch_falcons_events)
     extend_events(events, "gwcc", fetch_gwcc_events)
-    calendar = build_calendar(dedupe_events(events))
+    deduped_events = dedupe_events(events)
+    print(f"[info] total events before dedupe: {len(events)}", file=sys.stderr)
+    print(f"[info] total events after dedupe: {len(deduped_events)}", file=sys.stderr)
+    calendar = build_calendar(deduped_events)
 
     with open(OUTPUT_PATH, "wb") as f:
         f.write(calendar.to_ical())
