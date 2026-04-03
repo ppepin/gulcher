@@ -45,8 +45,11 @@ def build_calendar(events: list[EventRecord]) -> Calendar:
     calendar.add("version", "2.0")
     generated_at = datetime.now(UTC)
     local_today = generated_at.astimezone(DEFAULT_TIMEZONE).date()
+    local_cutoff = local_today.fromordinal(local_today.toordinal() + 30)
     upcoming_events = [
-        event for event in events if event["start_at"].astimezone(DEFAULT_TIMEZONE).date() >= local_today
+        event
+        for event in events
+        if local_today <= event["start_at"].astimezone(DEFAULT_TIMEZONE).date() <= local_cutoff
     ]
 
     for item in sorted(upcoming_events, key=lambda event: event["start_at"]):
