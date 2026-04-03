@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 from gulcher.models import EventRecord
 from gulcher.calendar import normalize_summary
 from gulcher.utils import (
+    DATE_PATTERN,
     DEFAULT_TIMEZONE,
     extract_json_ld,
     fetch_html,
@@ -32,6 +33,12 @@ LISTING_DATE_PATTERN = re.compile(
     r"\s+)?\d{1,2},?\s*)?\d{4}"
 )
 START_TIME_PATTERN = re.compile(r"Event Starts\s+(\d{1,2}:\d{2}\s*[AP]M)")
+GENERIC_SUMMARIES = {
+    "events and tickets",
+    "upcoming events presented by",
+    "featured events",
+    "event details",
+}
 MONTH_NAME_MAP = {
     "Jan": "January",
     "Feb": "February",
@@ -187,11 +194,66 @@ def build_listing_start_at(event_date: date, time_value: str | None) -> datetime
     return parse_event_date_and_time(raw_date, time_value)
 
 
-def enrich_listing_event(base_event: EventRecord, detail_event: EventRecord) -> EventRecord:
+def has_placeholder_midnight(event: EventRecord) -> bool:
+    local_start = event["start_at"].astimezone(DEFAULT_TIMEZONE)
+    return (local_start.hour, local_start.minute, local_start.second) == (0, 0, 0)
+
+
+def apply_detail_time(base_event: EventRecord, detail_event: EventRecord) -> EventRecord:
+    if not has_placeholder_midnight(base_event):
+        return base_event
+
+    detail_local_start = detail_event["start_at"].astimezone(DEFAULT_TIMEZONE)
+    if (detail_local_start.hour, detail_local_start.minute, detail_local_start.second) == (0, 0, 0):
+        return base_event
+
+    base_local_start = base_event["start_at"].astimezone(DEFAULT_TIMEZONE)
     enriched = dict(base_event)
+    enriched["start_at"] = base_local_start.replace(
+        hour=detail_local_start.hour,
+        minute=detail_local_start.minute,
+        second=detail_local_start.second,
+        microsecond=detail_local_start.microsecond,
+    )
+    return enriched
+
+
+def extract_listing_time(block_text: str, summary: str, subtitle: str | None) -> str | None:
+    time_match = START_TIME_PATTERN.search(block_text)
+    if time_match is not None:
+        return time_match.group(1)
+
+    filtered_lines = []
+    for line in block_text.splitlines():
+        cleaned = line.strip()
+        if not cleaned:
+            continue
+        if cleaned == summary or cleaned == (subtitle or ""):
+            continue
+        filtered_lines.append(cleaned)
+
+    for line in filtered_lines:
+        if line in {"More Info", "Buy Tickets", "Featured Events"}:
+            continue
+        if DATE_PATTERN.search(line):
+            continue
+        time_match = re.search(r"\b(\d{1,2}:\d{2}\s*[AP]M)\b", line)
+        if time_match is not None:
+            return time_match.group(1)
+
+    return None
+
+
+def enrich_listing_event(base_event: EventRecord, detail_event: EventRecord) -> EventRecord:
+    enriched = apply_detail_time(base_event, detail_event)
     if detail_event.get("description"):
         enriched["description"] = detail_event["description"]
-    if detail_event.get("end_at") is not None:
+    same_local_day = (
+        detail_event["end_at"] is not None
+        and detail_event["end_at"].astimezone(DEFAULT_TIMEZONE).date()
+        == base_event["start_at"].astimezone(DEFAULT_TIMEZONE).date()
+    )
+    if same_local_day:
         enriched["end_at"] = detail_event["end_at"]
     if detail_event.get("url") and "/events/detail/" in detail_event["url"]:
         enriched["url"] = detail_event["url"]
@@ -201,6 +263,7 @@ def enrich_listing_event(base_event: EventRecord, detail_event: EventRecord) -> 
 def merge_state_farm_records(detail_events: list[EventRecord], listing_events: list[EventRecord]) -> list[EventRecord]:
     merged_events: list[EventRecord] = []
     listing_index: dict[tuple[str, str, str | None], int] = {}
+    detail_series_index: dict[tuple[str, str | None], EventRecord] = {}
 
     for item in listing_events:
         key = (
@@ -212,6 +275,14 @@ def merge_state_farm_records(detail_events: list[EventRecord], listing_events: l
         merged_events.append(item)
 
     for item in detail_events:
+        summary_location_key = (
+            normalize_summary(item["summary"]),
+            item["location"].strip().lower() if item["location"] else None,
+        )
+        existing_series = detail_series_index.get(summary_location_key)
+        if existing_series is None or existing_series["start_at"] > item["start_at"]:
+            detail_series_index[summary_location_key] = item
+
         key = (
             normalize_summary(item["summary"]),
             item["start_at"].astimezone(DEFAULT_TIMEZONE).date().isoformat(),
@@ -228,6 +299,16 @@ def merge_state_farm_records(detail_events: list[EventRecord], listing_events: l
             listing_index[key] = len(merged_events)
             merged_events.append(item)
 
+    for index, item in enumerate(merged_events):
+        summary_location_key = (
+            normalize_summary(item["summary"]),
+            item["location"].strip().lower() if item["location"] else None,
+        )
+        detail_event = detail_series_index.get(summary_location_key)
+        if detail_event is None:
+            continue
+        merged_events[index] = apply_detail_time(item, detail_event)
+
     return merged_events
 
 
@@ -238,7 +319,7 @@ def extract_state_farm_arena_listing_events(listing_html: str, listing_url: str)
 
     for heading in soup.find_all(["h2", "h3"]):
         summary = heading.get_text(" ", strip=True)
-        if not summary or summary in {"Events & Tickets", "Upcoming Events presented by"}:
+        if not summary or normalize_summary(summary) in GENERIC_SUMMARIES:
             continue
 
         block = heading.parent
@@ -250,14 +331,13 @@ def extract_state_farm_arena_listing_events(listing_html: str, listing_url: str)
         if date_match is None:
             continue
 
-        time_match = START_TIME_PATTERN.search(block_text)
         raw_date = date_match.group(0)
-        time_value = time_match.group(1) if time_match else None
 
         subtitle = None
         subtitle_node = heading.find_next_sibling(["h4", "h5"])
         if subtitle_node is not None:
             subtitle = subtitle_node.get_text(" ", strip=True) or None
+        time_value = extract_listing_time(block_text, summary, subtitle)
 
         detail_url = listing_url
         for link in block.find_all("a", href=True):
