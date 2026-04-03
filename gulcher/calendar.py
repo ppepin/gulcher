@@ -1,10 +1,12 @@
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from icalendar import Calendar, Event
 
 from gulcher.models import EventRecord
 from gulcher.utils import DEFAULT_TIMEZONE, build_uid
+
+DEFAULT_EVENT_DURATION = timedelta(hours=3)
 
 
 def normalize_summary(summary: str) -> str:
@@ -55,9 +57,10 @@ def build_calendar(events: list[EventRecord]) -> Calendar:
     for item in sorted(upcoming_events, key=lambda event: event["start_at"]):
         event = Event()
         event.add("summary", item["summary"])
-        event.add("dtstart", item["start_at"].astimezone(UTC))
-        if item["end_at"] is not None:
-            event.add("dtend", item["end_at"].astimezone(UTC))
+        start_at_utc = item["start_at"].astimezone(UTC)
+        end_at = item["end_at"] or (item["start_at"] + DEFAULT_EVENT_DURATION)
+        event.add("dtstart", start_at_utc)
+        event.add("dtend", end_at.astimezone(UTC))
         event.add("dtstamp", generated_at)
         event.add("uid", build_uid(item["source"], item["url"], item["start_at"]))
 
