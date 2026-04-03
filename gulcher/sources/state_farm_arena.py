@@ -1,6 +1,5 @@
 from datetime import date, datetime, timedelta
 import re
-import sys
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
@@ -393,8 +392,7 @@ def extract_state_farm_arena_listing_events(listing_html: str, listing_url: str)
 
         try:
             event_dates = expand_listing_dates(raw_date)
-        except ValueError as exc:
-            print(f"[warn] state_farm_arena unsupported listing date '{raw_date}': {exc}", file=sys.stderr)
+        except ValueError:
             continue
 
         for event_date in event_dates:
@@ -450,11 +448,6 @@ def fetch_events() -> list[EventRecord]:
             seen_detail_urls.add(detail_url)
             detail_urls.append(detail_url)
 
-    print(
-        f"[info] state_farm_arena discovered {len(seen_listing_urls)} listing pages and {len(detail_urls)} detail urls",
-        file=sys.stderr,
-    )
-
     if not fetched_listing:
         raise RuntimeError("unable to fetch any State Farm Arena listing pages")
 
@@ -489,27 +482,6 @@ def fetch_events() -> list[EventRecord]:
             seen_event_keys.add(event_key)
             events.append(item)
 
-    print(
-        f"[info] state_farm_arena detail pages produced {len(events)} events, listing extraction produced {len(listing_events)} events",
-        file=sys.stderr,
-    )
-
     merged_events = merge_state_farm_records(events, listing_events)
-
-    print(
-        f"[info] state_farm_arena merged total {len(merged_events)} events",
-        file=sys.stderr,
-    )
-
-    placeholder_titles = [
-        f"{item['summary']} @ {item['start_at'].astimezone(DEFAULT_TIMEZONE).isoformat()}"
-        for item in merged_events
-        if has_placeholder_midnight(item)
-    ]
-    if placeholder_titles:
-        print(
-            "[info] state_farm_arena placeholder-midnight events: " + "; ".join(placeholder_titles),
-            file=sys.stderr,
-        )
 
     return merged_events
