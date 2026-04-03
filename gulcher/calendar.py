@@ -57,10 +57,10 @@ def build_calendar(events: list[EventRecord]) -> Calendar:
     for item in sorted(upcoming_events, key=lambda event: event["start_at"]):
         event = Event()
         event.add("summary", item["summary"])
-        start_at_utc = item["start_at"].astimezone(UTC)
+        start_at_local = item["start_at"].astimezone(DEFAULT_TIMEZONE)
         end_at = item["end_at"] or (item["start_at"] + DEFAULT_EVENT_DURATION)
-        event.add("dtstart", start_at_utc)
-        event.add("dtend", end_at.astimezone(UTC))
+        event.add("dtstart", start_at_local)
+        event.add("dtend", end_at.astimezone(DEFAULT_TIMEZONE))
         event.add("dtstamp", generated_at)
         event.add("uid", build_uid(item["source"], item["url"], item["start_at"]))
 
