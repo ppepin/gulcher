@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime, timedelta
 import re
 import sys
 from urllib.parse import urljoin
@@ -6,7 +6,9 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
 from gulcher.models import EventRecord
+from gulcher.calendar import normalize_summary
 from gulcher.utils import (
+    DEFAULT_TIMEZONE,
     extract_json_ld,
     fetch_html,
     iter_event_nodes,
@@ -25,9 +27,9 @@ STATE_FARM_ARENA_SEED_URLS = [
 LISTING_DATE_PATTERN = re.compile(
     r"(?:(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+)?"
     r"(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)"
-    r"\s+\d{1,2}(?:\s*-\s*(?:"
+    r"\s+\d{1,2},?\s*(?:-\s*(?:"
     r"(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)"
-    r"\s+)?\d{1,2})?\s+\d{4}"
+    r"\s+)?\d{1,2},?\s*)?\d{4}"
 )
 START_TIME_PATTERN = re.compile(r"Event Starts\s+(\d{1,2}:\d{2}\s*[AP]M)")
 MONTH_NAME_MAP = {
@@ -44,6 +46,7 @@ MONTH_NAME_MAP = {
     "Nov": "November",
     "Dec": "December",
 }
+DAY_NAME_PREFIXES = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}
 
 
 def extract_state_farm_arena_detail_urls(html: str) -> list[str]:
@@ -122,25 +125,116 @@ def normalize_state_farm_arena_events(payloads: list[object]) -> list[EventRecor
     return normalized_events
 
 
-def normalize_listing_date(raw_date: str) -> str:
-    cleaned = raw_date.strip()
-    parts = cleaned.split()
-    if parts and parts[0] in {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}:
-        parts = parts[1:]
+def normalize_month_name(value: str) -> str:
+    return MONTH_NAME_MAP.get(value, value)
 
+
+def parse_listing_date_token(raw_value: str, default_month: str | None, year: int) -> date:
+    parts = raw_value.strip().replace(",", "").split()
+    if parts and parts[0] in DAY_NAME_PREFIXES:
+        parts = parts[1:]
     if not parts:
+        raise ValueError(f"unsupported date token: {raw_value}")
+
+    if len(parts) == 1:
+        if default_month is None:
+            raise ValueError(f"missing month in date token: {raw_value}")
+        month_name = default_month
+        day_value = parts[0]
+    else:
+        month_name = normalize_month_name(parts[0])
+        day_value = parts[1]
+
+    parsed = datetime.strptime(f"{month_name} {day_value} {year}", "%B %d %Y")
+    return parsed.date()
+
+
+def expand_listing_dates(raw_date: str) -> list[date]:
+    cleaned = raw_date.strip().replace(" ,", ",")
+    year_match = re.search(r"(20\d{2})$", cleaned)
+    if year_match is None:
         raise ValueError(f"unsupported date format: {raw_date}")
 
-    month = MONTH_NAME_MAP.get(parts[0], parts[0])
-    day = parts[1]
-    year = parts[-1]
-    return f"{month} {day.rstrip(',')}, {year}"
+    year = int(year_match.group(1))
+    without_year = cleaned[: year_match.start()].strip().rstrip(",")
+    if "-" not in without_year:
+        return [parse_listing_date_token(without_year, None, year)]
+
+    start_raw, end_raw = [part.strip() for part in without_year.split("-", 1)]
+    start_parts = start_raw.replace(",", "").split()
+    if start_parts and start_parts[0] in DAY_NAME_PREFIXES:
+        start_parts = start_parts[1:]
+    if not start_parts:
+        raise ValueError(f"unsupported date range: {raw_date}")
+
+    start_month = normalize_month_name(start_parts[0])
+    start_date = parse_listing_date_token(start_raw, None, year)
+    end_date = parse_listing_date_token(end_raw, start_month, year)
+    if end_date < start_date:
+        raise ValueError(f"descending date range: {raw_date}")
+
+    expanded_dates: list[date] = []
+    current = start_date
+    while current <= end_date:
+        expanded_dates.append(current)
+        current += timedelta(days=1)
+
+    return expanded_dates
+
+
+def build_listing_start_at(event_date: date, time_value: str | None) -> datetime:
+    raw_date = f"{event_date.strftime('%B')} {event_date.day}, {event_date.year}"
+    return parse_event_date_and_time(raw_date, time_value)
+
+
+def enrich_listing_event(base_event: EventRecord, detail_event: EventRecord) -> EventRecord:
+    enriched = dict(base_event)
+    if detail_event.get("description"):
+        enriched["description"] = detail_event["description"]
+    if detail_event.get("end_at") is not None:
+        enriched["end_at"] = detail_event["end_at"]
+    if detail_event.get("url") and "/events/detail/" in detail_event["url"]:
+        enriched["url"] = detail_event["url"]
+    return enriched
+
+
+def merge_state_farm_records(detail_events: list[EventRecord], listing_events: list[EventRecord]) -> list[EventRecord]:
+    merged_events: list[EventRecord] = []
+    listing_index: dict[tuple[str, str, str | None], int] = {}
+
+    for item in listing_events:
+        key = (
+            normalize_summary(item["summary"]),
+            item["start_at"].astimezone(DEFAULT_TIMEZONE).date().isoformat(),
+            item["location"].strip().lower() if item["location"] else None,
+        )
+        listing_index[key] = len(merged_events)
+        merged_events.append(item)
+
+    for item in detail_events:
+        key = (
+            normalize_summary(item["summary"]),
+            item["start_at"].astimezone(DEFAULT_TIMEZONE).date().isoformat(),
+            item["location"].strip().lower() if item["location"] else None,
+        )
+        existing_index = listing_index.get(key)
+        if existing_index is not None:
+            merged_events[existing_index] = enrich_listing_event(merged_events[existing_index], item)
+            continue
+
+        local_event_date = item["start_at"].astimezone(DEFAULT_TIMEZONE).date()
+        today = datetime.now(DEFAULT_TIMEZONE).date()
+        if today <= local_event_date <= today + timedelta(days=30):
+            listing_index[key] = len(merged_events)
+            merged_events.append(item)
+
+    return merged_events
 
 
 def extract_state_farm_arena_listing_events(listing_html: str, listing_url: str) -> list[EventRecord]:
     soup = BeautifulSoup(listing_html, "html.parser")
     events: list[EventRecord] = []
-    seen_keys: set[tuple[str, str]] = set()
+    seen_keys: set[tuple[str, str, str]] = set()
 
     for heading in soup.find_all(["h2", "h3"]):
         summary = heading.get_text(" ", strip=True)
@@ -173,25 +267,30 @@ def extract_state_farm_arena_listing_events(listing_html: str, listing_url: str)
                 detail_url = urljoin(STATE_FARM_ARENA_LISTING_URL, href)
                 break
 
-        normalized_date = normalize_listing_date(raw_date)
-        start_at = parse_event_date_and_time(normalized_date, time_value)
-
-        key = (summary, start_at.isoformat())
-        if key in seen_keys:
+        try:
+            event_dates = expand_listing_dates(raw_date)
+        except ValueError as exc:
+            print(f"[warn] state_farm_arena unsupported listing date '{raw_date}': {exc}", file=sys.stderr)
             continue
 
-        seen_keys.add(key)
-        events.append(
-            {
-                "source": "state-farm-arena",
-                "summary": summary,
-                "description": subtitle,
-                "url": detail_url,
-                "location": "State Farm Arena",
-                "start_at": start_at,
-                "end_at": None,
-            }
-        )
+        for event_date in event_dates:
+            start_at = build_listing_start_at(event_date, time_value)
+            key = (normalize_summary(summary), event_date.isoformat(), "state farm arena")
+            if key in seen_keys:
+                continue
+
+            seen_keys.add(key)
+            events.append(
+                {
+                    "source": "state-farm-arena",
+                    "summary": summary,
+                    "description": subtitle,
+                    "url": detail_url,
+                    "location": "State Farm Arena",
+                    "start_at": start_at,
+                    "end_at": None,
+                }
+            )
 
     return events
 
@@ -271,14 +370,7 @@ def fetch_events() -> list[EventRecord]:
         file=sys.stderr,
     )
 
-    merged_events = list(events)
-    merged_keys = {(event["summary"], event["start_at"].isoformat()) for event in events}
-    for item in listing_events:
-        event_key = (item["summary"], item["start_at"].isoformat())
-        if event_key in merged_keys:
-            continue
-        merged_keys.add(event_key)
-        merged_events.append(item)
+    merged_events = merge_state_farm_records(events, listing_events)
 
     print(
         f"[info] state_farm_arena merged total {len(merged_events)} events",
