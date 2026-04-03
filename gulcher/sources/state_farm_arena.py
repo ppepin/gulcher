@@ -457,4 +457,15 @@ def fetch_events() -> list[EventRecord]:
         file=sys.stderr,
     )
 
+    placeholder_titles = [
+        f"{item['summary']} @ {item['start_at'].astimezone(DEFAULT_TIMEZONE).isoformat()}"
+        for item in merged_events
+        if has_placeholder_midnight(item)
+    ]
+    if placeholder_titles:
+        print(
+            "[info] state_farm_arena placeholder-midnight events: " + "; ".join(placeholder_titles),
+            file=sys.stderr,
+        )
+
     return merged_events
