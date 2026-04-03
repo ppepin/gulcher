@@ -244,6 +244,48 @@ def extract_listing_time(block_text: str, summary: str, subtitle: str | None) ->
     return None
 
 
+def extract_listing_time_from_heading(heading: object, summary: str, subtitle: str | None) -> str | None:
+    if not getattr(heading, "next_elements", None):
+        return None
+
+    scanned = 0
+    for element in heading.next_elements:
+        if getattr(element, "name", None) in {"h2", "h3"}:
+            next_summary = element.get_text(" ", strip=True)
+            if next_summary and next_summary != summary:
+                break
+
+        text = None
+        if isinstance(element, str):
+            text = element.strip()
+        elif getattr(element, "get_text", None):
+            text = element.get_text(" ", strip=True)
+
+        if not text:
+            continue
+        if text == summary or text == (subtitle or ""):
+            continue
+
+        scanned += 1
+        if scanned > 30:
+            break
+
+        time_match = START_TIME_PATTERN.search(text)
+        if time_match is not None:
+            return time_match.group(1)
+
+        if text in {"Buy Tickets", "Parking", "More Info"}:
+            continue
+        if DATE_PATTERN.search(text):
+            continue
+
+        generic_time_match = re.search(r"\b(\d{1,2}:\d{2}\s*[AP]M)\b", text)
+        if generic_time_match is not None:
+            return generic_time_match.group(1)
+
+    return None
+
+
 def enrich_listing_event(base_event: EventRecord, detail_event: EventRecord) -> EventRecord:
     enriched = apply_detail_time(base_event, detail_event)
     if detail_event.get("description"):
@@ -338,6 +380,8 @@ def extract_state_farm_arena_listing_events(listing_html: str, listing_url: str)
         if subtitle_node is not None:
             subtitle = subtitle_node.get_text(" ", strip=True) or None
         time_value = extract_listing_time(block_text, summary, subtitle)
+        if time_value is None:
+            time_value = extract_listing_time_from_heading(heading, summary, subtitle)
 
         detail_url = listing_url
         for link in block.find_all("a", href=True):
