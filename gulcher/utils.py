@@ -30,6 +30,12 @@ def fetch_html(url: str) -> str:
     return response.text
 
 
+def fetch_bytes(url: str) -> bytes:
+    response = requests.get(url, headers=DEFAULT_HEADERS, timeout=30)
+    response.raise_for_status()
+    return response.content
+
+
 def extract_json_ld(html: str) -> list[Any]:
     soup = BeautifulSoup(html, "html.parser")
     payloads: list[Any] = []

@@ -2,7 +2,7 @@ from bs4 import BeautifulSoup
 from icalendar import Calendar
 
 from gulcher.models import EventRecord
-from gulcher.utils import fetch_html, parse_event_datetime
+from gulcher.utils import fetch_bytes, fetch_html, parse_event_datetime
 
 
 ATLANTA_UNITED_DOWNLOADS_URL = "https://www.atlutd.com/schedule/downloadable-calendars"
@@ -34,8 +34,8 @@ def fetch_events() -> list[EventRecord]:
     if not calendar_url:
         return []
 
-    calendar_text = fetch_html(calendar_url)
-    calendar = Calendar.from_ical(calendar_text)
+    calendar_bytes = fetch_bytes(calendar_url)
+    calendar = Calendar.from_ical(calendar_bytes)
     events: list[EventRecord] = []
 
     for component in calendar.walk("VEVENT"):
