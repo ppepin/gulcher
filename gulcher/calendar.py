@@ -76,6 +76,7 @@ def build_calendar(events: list[EventRecord]) -> Calendar:
         event.add("dtend", end_at.astimezone(DEFAULT_TIMEZONE))
         event.add("dtstamp", generated_at)
         event.add("uid", build_uid(item["source"], item["url"], item["start_at"]))
+        event.add("transp", "TRANSPARENT")
 
         if item["description"]:
             event.add("description", item["description"])
