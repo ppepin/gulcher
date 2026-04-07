@@ -11,7 +11,7 @@ CALENDAR_NAME = "Centenial Yards Events"
 CALENDAR_DESCRIPTION = (
     "Events impacting traffic in the area of Mercedes Benz Stadium, State Farm Arena and Georgia World Congress Center."
 )
-CALENDAR_REFRESH_INTERVAL = timedelta(hours=1)
+CALENDAR_REFRESH_INTERVAL = timedelta(hours=2)
 CALENDAR_TIMEZONE = "America/New_York"
 
 
@@ -54,6 +54,7 @@ def build_calendar(events: list[EventRecord]) -> Calendar:
     calendar.add("name", CALENDAR_NAME)
     calendar.add("description", CALENDAR_DESCRIPTION)
     calendar.add("refresh-interval", CALENDAR_REFRESH_INTERVAL)
+    calendar.add("X-PUBLISHED-TTL", CALENDAR_REFRESH_INTERVAL)
     calendar.add("X-WR-CALNAME", CALENDAR_NAME)
     calendar.add("X-WR-CALDESC", CALENDAR_DESCRIPTION)
     calendar.add("X-WR-TIMEZONE", CALENDAR_TIMEZONE)
