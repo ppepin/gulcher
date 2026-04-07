@@ -7,6 +7,11 @@ from gulcher.models import EventRecord
 from gulcher.utils import DEFAULT_TIMEZONE, build_uid
 
 DEFAULT_EVENT_DURATION = timedelta(hours=3)
+CALENDAR_NAME = "Centenial Yards Events"
+CALENDAR_DESCRIPTION = (
+    "Events impacting traffic in the area of Mercedes Benz Stadium, State Farm Arena and Georgia World Congress Center."
+)
+CALENDAR_REFRESH_INTERVAL = timedelta(hours=1)
 
 
 def normalize_summary(summary: str) -> str:
@@ -45,6 +50,9 @@ def build_calendar(events: list[EventRecord]) -> Calendar:
     calendar = Calendar()
     calendar.add("prodid", "-//gulcher//events//EN")
     calendar.add("version", "2.0")
+    calendar.add("name", CALENDAR_NAME)
+    calendar.add("description", CALENDAR_DESCRIPTION)
+    calendar.add("refresh-interval", CALENDAR_REFRESH_INTERVAL)
     generated_at = datetime.now(UTC)
     local_today = generated_at.astimezone(DEFAULT_TIMEZONE).date()
     local_cutoff = local_today.fromordinal(local_today.toordinal() + 30)
