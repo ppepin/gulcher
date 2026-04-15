@@ -47,6 +47,16 @@ def dedupe_events(events: list[EventRecord]) -> list[EventRecord]:
     return list(deduped_events.values())
 
 
+def get_upcoming_events(events: list[EventRecord], *, days_ahead: int = 30) -> list[EventRecord]:
+    local_today = datetime.now(UTC).astimezone(DEFAULT_TIMEZONE).date()
+    local_cutoff = local_today.fromordinal(local_today.toordinal() + days_ahead)
+    return [
+        event
+        for event in events
+        if local_today <= event["start_at"].astimezone(DEFAULT_TIMEZONE).date() <= local_cutoff
+    ]
+
+
 def build_calendar(events: list[EventRecord]) -> Calendar:
     calendar = Calendar()
     calendar.add("prodid", "-//gulcher//events//EN")
@@ -59,13 +69,7 @@ def build_calendar(events: list[EventRecord]) -> Calendar:
     calendar.add("X-WR-CALDESC", CALENDAR_DESCRIPTION)
     calendar.add("X-WR-TIMEZONE", CALENDAR_TIMEZONE)
     generated_at = datetime.now(UTC)
-    local_today = generated_at.astimezone(DEFAULT_TIMEZONE).date()
-    local_cutoff = local_today.fromordinal(local_today.toordinal() + 30)
-    upcoming_events = [
-        event
-        for event in events
-        if local_today <= event["start_at"].astimezone(DEFAULT_TIMEZONE).date() <= local_cutoff
-    ]
+    upcoming_events = get_upcoming_events(events)
 
     for item in sorted(upcoming_events, key=lambda event: event["start_at"]):
         event = Event()

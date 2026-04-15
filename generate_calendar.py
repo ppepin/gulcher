@@ -5,9 +5,12 @@ from gulcher.sources.atlanta_united import fetch_events as fetch_atlanta_united_
 from gulcher.sources.falcons import fetch_events as fetch_falcons_events
 from gulcher.sources.mercedes_benz_stadium import fetch_events as fetch_mercedes_benz_stadium_events
 from gulcher.sources.state_farm_arena import fetch_events as fetch_state_farm_arena_events
+from gulcher.web import render_schedule_page
 
 
-OUTPUT_PATH = "gulcher-events.ics"
+ICS_OUTPUT_PATH = "gulcher-events.ics"
+COLOR_OUTPUT_PATH = "schedule-color.html"
+EINK_OUTPUT_PATH = "schedule-eink.html"
 
 
 def extend_events(events: list, source_name: str, fetcher) -> None:
@@ -26,9 +29,15 @@ def main() -> None:
     extend_events(events, "atlanta_falcons", fetch_falcons_events)
     deduped_events = dedupe_events(events)
     calendar = build_calendar(deduped_events)
+    color_schedule = render_schedule_page(deduped_events, theme="color")
+    eink_schedule = render_schedule_page(deduped_events, theme="eink")
 
-    with open(OUTPUT_PATH, "wb") as f:
+    with open(ICS_OUTPUT_PATH, "wb") as f:
         f.write(calendar.to_ical())
+    with open(COLOR_OUTPUT_PATH, "w", encoding="utf-8") as f:
+        f.write(color_schedule)
+    with open(EINK_OUTPUT_PATH, "w", encoding="utf-8") as f:
+        f.write(eink_schedule)
 
 
 if __name__ == "__main__":
