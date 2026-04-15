@@ -66,6 +66,12 @@ STATE_FARM_ARENA_DESCRIPTION_SECTION_HEADINGS = {
     "Premium & Groups",
     "Plan Your Visit",
 }
+STATE_FARM_ARENA_CTA_MARKERS = (
+    "Make it a Night",
+    "Tickets",
+    "Premium & Groups",
+    "Plan Your Visit",
+)
 STATE_FARM_ARENA_DETAIL_STOP_HEADINGS = {
     "Suite Rentals",
     "Stay & Play presented by Hotels.com",
@@ -92,7 +98,34 @@ def normalize_state_farm_arena_description(description: str | None) -> str | Non
     for source, replacement in STATE_FARM_ARENA_DESCRIPTION_REPLACEMENTS:
         cleaned = cleaned.replace(source, replacement)
     cleaned = re.sub(r"\.\s+\.", ".", cleaned)
-    return cleaned
+    return trim_state_farm_arena_description(cleaned)
+
+
+def trim_state_farm_arena_description(description: str) -> str:
+    trimmed = description
+    for marker in STATE_FARM_ARENA_CTA_MARKERS:
+        marker_patterns = (
+            f". {marker}.",
+            f". {marker} ",
+            marker,
+        )
+        cut_positions = [trimmed.find(pattern) for pattern in marker_patterns if trimmed.find(pattern) != -1]
+        if cut_positions:
+            trimmed = trimmed[: min(cut_positions)].rstrip(" .")
+            break
+
+    sentences = [part.strip() for part in re.split(r"(?<=[.!?])\s+", trimmed) if part.strip()]
+    if not sentences:
+        return description
+
+    kept_sentences = [sentences[0]]
+    for sentence in sentences[1:]:
+        normalized_sentence = sentence.lower()
+        if normalized_sentence.startswith("doors & entry"):
+            kept_sentences.append(sentence)
+        break
+
+    return " ".join(kept_sentences).strip()
 
 
 def extract_state_farm_arena_detail_description(detail_html: str) -> str | None:
