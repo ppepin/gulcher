@@ -60,6 +60,17 @@ STATE_FARM_ARENA_DESCRIPTION_REPLACEMENTS = (
     ("Premium & Groups Make it", "Premium & Groups. Make it"),
     ("Plan Your Visit Reserve", "Plan Your Visit. Reserve"),
 )
+STATE_FARM_ARENA_DETAIL_STOP_HEADINGS = {
+    "Suite Rentals",
+    "Stay & Play presented by Hotels.com",
+    "Parking: Buy Now & Save!",
+    "Plan Your Visit",
+    "Bag Policy",
+    "Cashless Enviroment",
+    "Cashless Environment",
+    "Omni Hotel Guests",
+    "Back To Top",
+}
 
 
 def normalize_state_farm_arena_description(description: str | None) -> str | None:
@@ -76,6 +87,45 @@ def normalize_state_farm_arena_description(description: str | None) -> str | Non
         cleaned = cleaned.replace(source, replacement)
     cleaned = re.sub(r"\.\s+\.", ".", cleaned)
     return cleaned
+
+
+def extract_state_farm_arena_detail_description(detail_html: str) -> str | None:
+    soup = BeautifulSoup(detail_html, "html.parser")
+    event_details_heading = soup.find(
+        lambda tag: getattr(tag, "name", None) in {"h2", "h3"} and tag.get_text(" ", strip=True) == "Event Details"
+    )
+    if event_details_heading is None:
+        return None
+
+    fragments: list[str] = []
+    seen_fragments: set[str] = set()
+
+    for tag in event_details_heading.find_all_next():
+        if tag == event_details_heading:
+            continue
+
+        tag_name = getattr(tag, "name", None)
+        if tag_name in {"h2", "h3"}:
+            tag_text = tag.get_text(" ", strip=True)
+            if tag_text in STATE_FARM_ARENA_DETAIL_STOP_HEADINGS:
+                break
+
+        if tag_name not in {"h4", "p"}:
+            continue
+
+        text = tag.get_text(" ", strip=True)
+        if not text or text in seen_fragments:
+            continue
+        if text in STATE_FARM_ARENA_DETAIL_STOP_HEADINGS:
+            break
+
+        seen_fragments.add(text)
+        fragments.append(text)
+
+    if not fragments:
+        return None
+
+    return normalize_state_farm_arena_description(" ".join(fragments))
 
 
 def extract_state_farm_arena_detail_urls(html: str) -> list[str]:
@@ -152,6 +202,20 @@ def normalize_state_farm_arena_events(payloads: list[object]) -> list[EventRecor
             )
 
     return normalized_events
+
+
+def enrich_detail_event_descriptions(detail_events: list[EventRecord], detail_description: str | None) -> list[EventRecord]:
+    if not detail_description:
+        return detail_events
+
+    enriched_events: list[EventRecord] = []
+    for item in detail_events:
+        enriched = dict(item)
+        existing_description = enriched.get("description") or ""
+        if len(detail_description) > len(existing_description):
+            enriched["description"] = detail_description
+        enriched_events.append(enriched)
+    return enriched_events
 
 
 def normalize_month_name(value: str) -> str:
@@ -493,6 +557,8 @@ def fetch_events() -> list[EventRecord]:
 
         payloads = extract_json_ld(detail_html)
         detail_events = normalize_state_farm_arena_events(payloads)
+        detail_description = extract_state_farm_arena_detail_description(detail_html)
+        detail_events = enrich_detail_event_descriptions(detail_events, detail_description)
 
         for item in detail_events:
             if item["url"] == STATE_FARM_ARENA_LISTING_URL:
