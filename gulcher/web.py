@@ -169,7 +169,6 @@ def render_schedule_page(events: list[EventRecord], *, theme: str) -> str:
             """.strip()
         )
 
-    theme_label = "Color" if theme == "color" else "Greyscale"
     alternate_path = "schedule-eink.html" if theme == "color" else "schedule-color.html"
     alternate_label = "greyscale e-ink" if theme == "color" else "color"
 
@@ -178,7 +177,7 @@ def render_schedule_page(events: list[EventRecord], *, theme: str) -> str:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{escape(CALENDAR_NAME)} Schedule ({theme_label})</title>
+  <title>{escape(CALENDAR_NAME)} Schedule</title>
   <meta name="description" content="{escape(CALENDAR_DESCRIPTION)}">
   <style>
     :root {{
@@ -206,13 +205,6 @@ def render_schedule_page(events: list[EventRecord], *, theme: str) -> str:
       padding: 28px;
       border-radius: 28px;
       {theme_values["panel"]}
-    }}
-    .eyebrow {{
-      margin: 0 0 8px;
-      font: 600 0.78rem/1.1 "Avenir Next", "Segoe UI", sans-serif;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-      color: var(--accent);
     }}
     h1 {{
       margin: 0;
@@ -314,7 +306,6 @@ def render_schedule_page(events: list[EventRecord], *, theme: str) -> str:
 <body>
   <main class="shell">
     <section class="hero">
-      <p class="eyebrow">{theme_label} Web Schedule</p>
       <h1>{escape(CALENDAR_NAME)}</h1>
       <p class="intro">{escape(CALENDAR_DESCRIPTION)}</p>
       <div class="hero-meta">
