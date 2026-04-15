@@ -91,6 +91,21 @@ def normalize_state_farm_arena_description(description: str | None) -> str | Non
 
 def extract_state_farm_arena_detail_description(detail_html: str) -> str | None:
     soup = BeautifulSoup(detail_html, "html.parser")
+    description_wrapper = soup.select_one("div.description_wrapper")
+    if description_wrapper is not None:
+        fragments: list[str] = []
+        seen_fragments: set[str] = set()
+
+        for tag in description_wrapper.find_all(["h4", "p"]):
+            text = tag.get_text(" ", strip=True)
+            if not text or text in seen_fragments:
+                continue
+            seen_fragments.add(text)
+            fragments.append(text)
+
+        if fragments:
+            return normalize_state_farm_arena_description(" ".join(fragments))
+
     event_details_heading = soup.find(
         lambda tag: getattr(tag, "name", None) in {"h2", "h3"} and tag.get_text(" ", strip=True) == "Event Details"
     )
