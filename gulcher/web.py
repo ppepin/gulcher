@@ -59,6 +59,13 @@ def format_source_label(source_name: str) -> str:
     return SOURCE_LABELS.get(source_name, source_name.replace("-", " ").title())
 
 
+def format_badge_label(event: EventRecord) -> str:
+    location = (event["location"] or "").strip()
+    if location:
+        return location
+    return format_source_label(event["source"])
+
+
 def format_event_time(event: EventRecord) -> str:
     start_at = event["start_at"].astimezone(DEFAULT_TIMEZONE)
     end_at = event["end_at"].astimezone(DEFAULT_TIMEZONE) if event["end_at"] else None
@@ -97,10 +104,9 @@ def format_event_description(event: EventRecord) -> str:
 
 def render_event(event: EventRecord) -> str:
     summary = escape(event["summary"])
-    source = escape(format_source_label(event["source"]))
+    source = escape(format_badge_label(event))
     source_key = escape(event["source"])
     time_label = escape(format_event_time(event))
-    location = escape(event["location"]) if event["location"] else ""
     description = format_event_description(event)
     url = event["url"].strip()
     url_markup = (
@@ -108,7 +114,6 @@ def render_event(event: EventRecord) -> str:
         if url
         else ""
     )
-    location_markup = f'<p class="meta">{location}</p>' if location else ""
     description_markup = f'<p class="description">{description}</p>' if description else ""
 
     return f"""
@@ -118,7 +123,6 @@ def render_event(event: EventRecord) -> str:
             <span class="source">{source}</span>
           </div>
           <h3>{summary}</h3>
-          {location_markup}
           {description_markup}
           {url_markup}
         </article>
