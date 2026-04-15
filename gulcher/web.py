@@ -192,7 +192,7 @@ def render_schedule_page(events: list[EventRecord], *, theme: str) -> str:
     * {{ box-sizing: border-box; }}
     body {{
       margin: 0;
-      font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+      font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
       {theme_values["body"]}
     }}
     a {{ color: var(--link); }}
@@ -208,6 +208,9 @@ def render_schedule_page(events: list[EventRecord], *, theme: str) -> str:
     }}
     h1 {{
       margin: 0;
+      font-family: "Futura", "Avenir Next", "Segoe UI", sans-serif;
+      font-weight: 700;
+      letter-spacing: -0.04em;
       font-size: clamp(2.2rem, 6vw, 4.75rem);
       line-height: 0.96;
     }}
@@ -216,6 +219,7 @@ def render_schedule_page(events: list[EventRecord], *, theme: str) -> str:
       margin: 14px 0 0;
       color: var(--muted);
       font-size: 1.05rem;
+      line-height: 1.5;
     }}
     .hero-meta {{
       display: flex;
@@ -236,7 +240,8 @@ def render_schedule_page(events: list[EventRecord], *, theme: str) -> str:
       margin: 0 0 14px;
       padding-bottom: 10px;
       border-bottom: 2px solid var(--rule);
-      font: 600 1.4rem/1.2 "Avenir Next", "Segoe UI", sans-serif;
+      font: 700 1.25rem/1.2 "Avenir Next", "Segoe UI", sans-serif;
+      letter-spacing: 0.01em;
     }}
     .events {{
       display: grid;
@@ -276,8 +281,11 @@ def render_schedule_page(events: list[EventRecord], *, theme: str) -> str:
     }}
     .event h3 {{
       margin: 14px 0 8px;
+      font-family: "Futura", "Avenir Next", "Segoe UI", sans-serif;
+      font-weight: 700;
+      letter-spacing: -0.03em;
       font-size: 1.4rem;
-      line-height: 1.05;
+      line-height: 1.08;
     }}
     .meta, .description {{
       margin: 0 0 10px;
