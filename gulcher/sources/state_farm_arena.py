@@ -53,6 +53,29 @@ MONTH_NAME_MAP = {
     "Dec": "December",
 }
 DAY_NAME_PREFIXES = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}
+STATE_FARM_ARENA_DESCRIPTION_REPLACEMENTS = (
+    ("General Public Make it a Night", "General Public. Make it a Night."),
+    ("Make it a Night Upgrade", "Make it a Night. Upgrade"),
+    ("Tickets Tap Buy Tickets", "Tickets. Tap Buy Tickets"),
+    ("Premium & Groups Make it", "Premium & Groups. Make it"),
+    ("Plan Your Visit Reserve", "Plan Your Visit. Reserve"),
+)
+
+
+def normalize_state_farm_arena_description(description: str | None) -> str | None:
+    if not description:
+        return description
+
+    cleaned = re.sub(r"\s+", " ", description).strip()
+    cleaned = re.sub(r"([.!?])([A-Z])", r"\1 \2", cleaned)
+    cleaned = re.sub(r"([a-z])([A-Z])", r"\1 \2", cleaned)
+    cleaned = re.sub(r"([A-Za-z])(\d)", r"\1 \2", cleaned)
+    cleaned = re.sub(r"(\d)([A-Za-z])", r"\1 \2", cleaned)
+    cleaned = re.sub(r"([.)])([A-Z])", r"\1 \2", cleaned)
+    for source, replacement in STATE_FARM_ARENA_DESCRIPTION_REPLACEMENTS:
+        cleaned = cleaned.replace(source, replacement)
+    cleaned = re.sub(r"\.\s+\.", ".", cleaned)
+    return cleaned
 
 
 def extract_state_farm_arena_detail_urls(html: str) -> list[str]:
@@ -120,7 +143,7 @@ def normalize_state_farm_arena_events(payloads: list[object]) -> list[EventRecor
                 {
                     "source": "state-farm-arena",
                     "summary": raw_event.get("name", "State Farm Arena Event"),
-                    "description": raw_event.get("description"),
+                    "description": normalize_state_farm_arena_description(raw_event.get("description")),
                     "url": event_url,
                     "location": location_name,
                     "start_at": start_at,
@@ -406,7 +429,7 @@ def extract_state_farm_arena_listing_events(listing_html: str, listing_url: str)
                 {
                     "source": "state-farm-arena",
                     "summary": summary,
-                    "description": subtitle,
+                    "description": normalize_state_farm_arena_description(subtitle),
                     "url": detail_url,
                     "location": "State Farm Arena",
                     "start_at": start_at,

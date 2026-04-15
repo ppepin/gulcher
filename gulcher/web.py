@@ -1,6 +1,7 @@
 from collections import defaultdict
 from datetime import UTC, datetime
 from html import escape
+import re
 
 from gulcher.calendar import CALENDAR_DESCRIPTION, CALENDAR_NAME, get_upcoming_events
 from gulcher.models import EventRecord
@@ -13,6 +14,12 @@ SOURCE_LABELS = {
     "mercedes-benz-stadium": "Mercedes-Benz Stadium",
     "state-farm-arena": "State Farm Arena",
 }
+STATE_FARM_ARENA_DESCRIPTION_HEADERS = (
+    "Make it a Night.",
+    "Tickets.",
+    "Premium & Groups.",
+    "Plan Your Visit.",
+)
 
 THEMES = {
     "color": {
@@ -61,13 +68,40 @@ def format_event_time(event: EventRecord) -> str:
     return f"{start_label} - {end_at.strftime('%-I:%M %p').lower()}"
 
 
+def format_event_description(event: EventRecord) -> str:
+    description = event["description"]
+    if not description:
+        return ""
+
+    if event["source"] != "state-farm-arena":
+        return escape(description)
+
+    pattern = re.compile(
+        r"(^|(?<=\.\s))("
+        + "|".join(re.escape(header) for header in STATE_FARM_ARENA_DESCRIPTION_HEADERS)
+        + r")"
+    )
+    parts: list[str] = []
+    last_index = 0
+
+    for match in pattern.finditer(description):
+        parts.append(escape(description[last_index:match.start()]))
+        prefix, header = match.groups()
+        parts.append(escape(prefix))
+        parts.append(f"<em>{escape(header)}</em>")
+        last_index = match.end()
+
+    parts.append(escape(description[last_index:]))
+    return "".join(parts)
+
+
 def render_event(event: EventRecord) -> str:
     summary = escape(event["summary"])
     source = escape(format_source_label(event["source"]))
     source_key = escape(event["source"])
     time_label = escape(format_event_time(event))
     location = escape(event["location"]) if event["location"] else ""
-    description = escape(event["description"]) if event["description"] else ""
+    description = format_event_description(event)
     url = event["url"].strip()
     url_markup = (
         f'<a class="event-link" href="{escape(url, quote=True)}">Event page</a>'
@@ -254,6 +288,10 @@ def render_schedule_page(events: list[EventRecord], *, theme: str) -> str:
       color: var(--muted);
       font-size: 0.98rem;
       line-height: 1.45;
+    }}
+    .description em {{
+      font-style: italic;
+      color: var(--accent);
     }}
     .event-link {{
       margin-top: auto;
