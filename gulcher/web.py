@@ -170,7 +170,7 @@ def render_schedule_page(events: list[EventRecord], *, theme: str) -> str:
         )
 
     alternate_path = "schedule-eink.html" if theme == "color" else "schedule-color.html"
-    alternate_label = "greyscale e-ink" if theme == "color" else "color"
+    alternate_label = "greyscale" if theme == "color" else "color"
 
     return f"""<!doctype html>
 <html lang="en">
