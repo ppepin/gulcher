@@ -9,6 +9,28 @@ ATLANTA_UNITED_DOWNLOADS_URL = "https://www.atlutd.com/schedule/downloadable-cal
 ATLANTA_UNITED_LOCATION = "Mercedes-Benz Stadium"
 
 
+def normalize_description(description: str | None) -> str | None:
+    if not description:
+        return None
+
+    cleaned = description.strip()
+    ticket_marker = cleaned.find("View tickets:")
+    if ticket_marker != -1:
+        cleaned = cleaned[:ticket_marker].rstrip()
+
+    return cleaned or None
+
+
+def normalize_location(location: str | None) -> str:
+    if not location:
+        return ATLANTA_UNITED_LOCATION
+
+    cleaned = location.strip()
+    if cleaned.startswith(ATLANTA_UNITED_LOCATION):
+        return ATLANTA_UNITED_LOCATION
+    return cleaned
+
+
 def extract_home_calendar_url(html: str) -> str | None:
     soup = BeautifulSoup(html, "html.parser")
     home_heading = soup.find(string=lambda text: isinstance(text, str) and "Home Matches" in text)
@@ -54,9 +76,9 @@ def fetch_events() -> list[EventRecord]:
             {
                 "source": "atlanta-united",
                 "summary": summary,
-                "description": str(component.get("description", "")).strip() or None,
+                "description": normalize_description(str(component.get("description", "")).strip() or None),
                 "url": url,
-                "location": str(component.get("location", ATLANTA_UNITED_LOCATION)).strip() or ATLANTA_UNITED_LOCATION,
+                "location": normalize_location(str(component.get("location", ATLANTA_UNITED_LOCATION)).strip() or None),
                 "start_at": start_at,
                 "end_at": end_at,
             }
