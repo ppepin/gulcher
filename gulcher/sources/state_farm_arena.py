@@ -60,6 +60,12 @@ STATE_FARM_ARENA_DESCRIPTION_REPLACEMENTS = (
     ("Premium & Groups Make it", "Premium & Groups. Make it"),
     ("Plan Your Visit Reserve", "Plan Your Visit. Reserve"),
 )
+STATE_FARM_ARENA_DESCRIPTION_SECTION_HEADINGS = {
+    "Make it a Night",
+    "Tickets",
+    "Premium & Groups",
+    "Plan Your Visit",
+}
 STATE_FARM_ARENA_DETAIL_STOP_HEADINGS = {
     "Suite Rentals",
     "Stay & Play presented by Hotels.com",
@@ -100,6 +106,8 @@ def extract_state_farm_arena_detail_description(detail_html: str) -> str | None:
             text = tag.get_text(" ", strip=True)
             if not text or text in seen_fragments:
                 continue
+            if text in STATE_FARM_ARENA_DESCRIPTION_SECTION_HEADINGS:
+                break
             seen_fragments.add(text)
             fragments.append(text)
 
