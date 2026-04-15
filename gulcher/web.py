@@ -311,7 +311,6 @@ def render_schedule_page(events: list[EventRecord], *, theme: str) -> str:
       <div class="hero-meta">
         <span>Updated {escape(generated_at.strftime('%B %-d, %Y at %-I:%M %p %Z'))}</span>
         <a href="webcal://example.com/calendar.ics">Subscribe to Calendar</a>
-        <a href="https://example.com/calendar.ics">HTTPS fallback</a>
         <a href="{alternate_path}">Switch to {alternate_label} view</a>
       </div>
     </section>
