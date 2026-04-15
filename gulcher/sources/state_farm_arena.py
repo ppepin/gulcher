@@ -116,8 +116,6 @@ def extract_state_farm_arena_detail_description(detail_html: str) -> str | None:
         text = tag.get_text(" ", strip=True)
         if not text or text in seen_fragments:
             continue
-        if text in STATE_FARM_ARENA_DETAIL_STOP_HEADINGS:
-            break
 
         seen_fragments.add(text)
         fragments.append(text)
