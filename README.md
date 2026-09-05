@@ -8,3 +8,4 @@ Running `python3 generate_calendar.py` now writes three artifacts:
 - `schedule-eink.html`
 
 ---
+Updated Sept 5, 2026
