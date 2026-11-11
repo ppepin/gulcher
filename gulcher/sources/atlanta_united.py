@@ -1,3 +1,6 @@
+import re
+from urllib.parse import urljoin
+
 from bs4 import BeautifulSoup
 from icalendar import Calendar
 
@@ -7,6 +10,8 @@ from gulcher.utils import fetch_bytes, fetch_html, parse_event_datetime
 
 ATLANTA_UNITED_DOWNLOADS_URL = "https://www.atlutd.com/schedule/downloadable-calendars"
 ATLANTA_UNITED_LOCATION = "Mercedes-Benz Stadium"
+HOME_HEADING_PATTERN = re.compile(r"\bHome\s+(?:Matches|Schedule)\b", re.IGNORECASE)
+OTHER_HEADING_PATTERN = re.compile(r"\b(?:Away\s+(?:Matches|Schedule)|Full\s+Schedule)\b", re.IGNORECASE)
 
 
 def normalize_description(description: str | None) -> str | None:
@@ -33,19 +38,21 @@ def normalize_location(location: str | None) -> str:
 
 def extract_home_calendar_url(html: str) -> str | None:
     soup = BeautifulSoup(html, "html.parser")
-    home_heading = soup.find(string=lambda text: isinstance(text, str) and "Home Matches" in text)
+    home_heading = soup.find(string=HOME_HEADING_PATTERN)
     if home_heading is None:
         return None
 
-    for link in home_heading.parent.find_all_next("a", href=True):
+    for link in home_heading.parent.find_all_next(["a", "p", "strong", "h1", "h2", "h3", "h4"]):
         link_text = link.get_text(" ", strip=True)
-        href = link["href"].strip()
-        if "Away Matches" in link_text:
+        if OTHER_HEADING_PATTERN.search(link_text):
             break
+        if link.name != "a" or not link.get("href"):
+            continue
+        href = link["href"].strip()
         if "Sync to Apple" not in link_text and "Sync to Outlook" not in link_text:
             continue
         if href.endswith(".ics"):
-            return href.replace("%20", " ")
+            return urljoin(ATLANTA_UNITED_DOWNLOADS_URL, href)
 
     return None
 
@@ -54,7 +61,7 @@ def fetch_events() -> list[EventRecord]:
     downloads_html = fetch_html(ATLANTA_UNITED_DOWNLOADS_URL)
     calendar_url = extract_home_calendar_url(downloads_html)
     if not calendar_url:
-        return []
+        raise RuntimeError("Atlanta United home calendar link was not found")
 
     calendar_bytes = fetch_bytes(calendar_url)
     calendar = Calendar.from_ical(calendar_bytes)
