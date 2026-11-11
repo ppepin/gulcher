@@ -2,10 +2,24 @@ from collections import defaultdict
 from datetime import UTC, datetime
 from html import escape
 import re
+from functools import lru_cache
+
+import qrcode
+from qrcode.image.svg import SvgPathFillImage
 
 from gulcher.calendar import CALENDAR_DESCRIPTION, CALENDAR_NAME, get_upcoming_events
 from gulcher.models import EventRecord
 from gulcher.utils import DEFAULT_TIMEZONE
+
+CALENDAR_FEED_URL = "https://ppepin.github.io/gulcher/gulcher-events.ics"
+CALENDAR_SUBSCRIBE_URL = CALENDAR_FEED_URL.replace("https://", "webcal://", 1)
+
+
+@lru_cache(maxsize=1)
+def subscription_qr_svg() -> str:
+    image = qrcode.make(CALENDAR_SUBSCRIBE_URL, image_factory=SvgPathFillImage, border=4)
+    return image.to_string(encoding="unicode")
+
 
 SOURCE_LABELS = {
     "atlanta-falcons": "Atlanta Falcons",
@@ -207,6 +221,20 @@ def render_schedule_page(events: list[EventRecord], *, theme: str) -> str:
       border-radius: 28px;
       {theme_values["panel"]}
     }}
+    .hero-layout {{
+      display: flex;
+      align-items: flex-start;
+      gap: 24px;
+    }}
+    .hero-copy {{ flex: 1; min-width: 0; }}
+    .subscribe-qr {{
+      flex: 0 0 180px;
+      margin: 0;
+      text-align: center;
+      font-size: 0.85rem;
+    }}
+    .subscribe-qr svg {{ display: block; width: 180px; height: 180px; }}
+    .subscribe-qr figcaption {{ margin-top: 8px; }}
     h1 {{
       margin: 0;
       font-family: "Futura", "Avenir Next", "Segoe UI", sans-serif;
@@ -307,6 +335,8 @@ def render_schedule_page(events: list[EventRecord], *, theme: str) -> str:
     @media (max-width: 640px) {{
       .shell {{ padding: 20px 14px 48px; }}
       .hero {{ padding: 20px; border-radius: 22px; }}
+      .hero-layout {{ flex-direction: column; }}
+      .subscribe-qr {{ flex-basis: auto; }}
       .event {{ border-radius: 16px; }}
       .event-header {{ flex-direction: column; align-items: flex-start; }}
     }}
@@ -315,12 +345,23 @@ def render_schedule_page(events: list[EventRecord], *, theme: str) -> str:
 <body>
   <main class="shell">
     <section class="hero">
+      <div class="hero-layout">
+      <div class="hero-copy">
       <h1>{escape(CALENDAR_NAME)}</h1>
       <p class="intro">{escape(CALENDAR_DESCRIPTION)}</p>
       <div class="hero-meta">
         <span>Updated {escape(generated_at.strftime('%B %-d, %Y at %-I:%M %p %Z'))}</span>
-        <a href="webcal://example.com/calendar.ics">Subscribe to Calendar</a>
+        <a href="{CALENDAR_SUBSCRIBE_URL}">Subscribe to Calendar</a>
+        <a href="{CALENDAR_FEED_URL}">Download ICS</a>
         <a href="{alternate_path}">Switch to {alternate_label} view</a>
+      </div>
+      </div>
+      <figure class="subscribe-qr">
+        <a href="{CALENDAR_SUBSCRIBE_URL}" aria-label="Subscribe to the Centennial Yards calendar">
+          {subscription_qr_svg()}
+        </a>
+        <figcaption>Scan to subscribe to the calendar</figcaption>
+      </figure>
       </div>
     </section>
     {"".join(sections)}

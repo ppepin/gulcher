@@ -1,4 +1,5 @@
 beautifulsoup4
 icalendar
 requests
+qrcode>=8.2,<9
 
