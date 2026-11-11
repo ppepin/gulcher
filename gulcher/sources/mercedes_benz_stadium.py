@@ -1,4 +1,4 @@
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup
 
@@ -44,12 +44,15 @@ def fetch_events() -> list[EventRecord]:
 
     for link in soup.find_all("a", href=True):
         href = link["href"].strip()
-        if "/events/" not in href:
-            continue
-        if href == "/events" or href.endswith("/events"):
+        detail_link = urljoin(MERCEDES_BENZ_STADIUM_EVENTS_URL, href)
+        parsed_link = urlparse(detail_link)
+        if (
+            parsed_link.netloc != urlparse(MERCEDES_BENZ_STADIUM_EVENTS_URL).netloc
+            or not parsed_link.path.startswith("/events/")
+            or not parsed_link.path.removeprefix("/events/").strip("/")
+        ):
             continue
 
-        detail_link = urljoin(MERCEDES_BENZ_STADIUM_EVENTS_URL, href)
         if detail_link in seen_urls:
             continue
 
@@ -63,6 +66,10 @@ def fetch_events() -> list[EventRecord]:
             block_text = ancestor.get_text("\n", strip=True)
             if "Date" in block_text and "Time" in block_text:
                 event_block = ancestor
+                break
+            # Featured slides may omit the labeled date/time fields. Never
+            # borrow those fields (or the heading) from the surrounding page.
+            if "w-dyn-item" in ancestor.get("class", []) or ancestor.name in {"article", "li"}:
                 break
 
         if event_block is None:
