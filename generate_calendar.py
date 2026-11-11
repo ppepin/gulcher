@@ -5,6 +5,7 @@ from gulcher.sources.atlanta_united import fetch_events as fetch_atlanta_united_
 from gulcher.sources.falcons import fetch_events as fetch_falcons_events
 from gulcher.sources.mercedes_benz_stadium import fetch_events as fetch_mercedes_benz_stadium_events
 from gulcher.sources.state_farm_arena import fetch_events as fetch_state_farm_arena_events
+from gulcher.sources.ticketmaster import fetch_events as fetch_ticketmaster_events, merge_events
 from gulcher.web import render_schedule_page
 
 
@@ -27,6 +28,9 @@ def main() -> None:
     extend_events(events, "mercedes_benz_stadium", fetch_mercedes_benz_stadium_events)
     extend_events(events, "atlanta_united", fetch_atlanta_united_events)
     extend_events(events, "atlanta_falcons", fetch_falcons_events)
+    ticketmaster_events = []
+    extend_events(ticketmaster_events, "ticketmaster", fetch_ticketmaster_events)
+    events = merge_events(events, ticketmaster_events)
     deduped_events = dedupe_events(events)
     calendar = build_calendar(deduped_events)
     color_schedule = render_schedule_page(deduped_events, theme="color")

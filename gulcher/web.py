@@ -13,6 +13,7 @@ SOURCE_LABELS = {
     "gwcc": "GWCC",
     "mercedes-benz-stadium": "Mercedes-Benz Stadium",
     "state-farm-arena": "State Farm Arena",
+    "ticketmaster": "Ticketmaster",
 }
 STATE_FARM_ARENA_DESCRIPTION_HEADERS = (
     "Make it a Night.",
