@@ -99,3 +99,27 @@ class TicketmasterTests(unittest.TestCase):
         ]:
             with self.subTest(overrides=overrides):
                 self.assertEqual(len(tm.merge_events([event], [{**event, **overrides}])), 2)
+
+    def test_olivia_title_and_time_conflicts_merge_on_each_date(self):
+        base = tm.normalize_event(api_event(), VENUE)
+        primary, supplements = [], []
+        for day in [11, 12]:
+            primary.append({**base, "source": "state-farm-arena", "location": "State Farm Arena",
+                            "summary": "Olivia Rodrigo", "description": "Venue details",
+                            "start_at": datetime(2026, 11, day, 19, 30, tzinfo=DEFAULT_TIMEZONE)})
+            supplements.append({**primary[-1], "source": "ticketmaster",
+                                "summary": "Olivia Rodrigo: The Unraveled Tour",
+                                "start_at": datetime(2026, 11, day, 19, tzinfo=DEFAULT_TIMEZONE)})
+        merged = tm.merge_events(primary, supplements)
+        self.assertEqual(len(merged), 2)
+        self.assertEqual([e["start_at"].day for e in merged], [11, 12])
+        self.assertTrue(all(e["start_at"].hour == 19 and e["start_at"].minute == 0 for e in merged))
+        self.assertTrue(all(e["description"] == "Venue details" for e in merged))
+
+    def test_ambiguous_nearby_performances_are_not_collapsed(self):
+        event = tm.normalize_event(api_event(), VENUE)
+        primary = {**event, "source": "state-farm-arena"}
+        supplements = [event, {**event, "start_at": event["start_at"].replace(minute=30)}]
+        self.assertEqual(len(tm.merge_events([primary], supplements)), 3)
+        primary_shows = [primary, {**primary, "start_at": primary["start_at"].replace(minute=30)}]
+        self.assertEqual(len(tm.merge_events(primary_shows, [event])), 3)

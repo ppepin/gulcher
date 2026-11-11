@@ -89,27 +89,37 @@ def title_words(summary: str) -> set[str]:
     return set(normalized.split())
 
 
+def matching_listing(existing: EventRecord, supplement: EventRecord) -> bool:
+    if existing["source"] == supplement["source"] or existing["location"] != supplement["location"]:
+        return False
+    old_start = existing["start_at"].astimezone(DEFAULT_TIMEZONE)
+    new_start = supplement["start_at"].astimezone(DEFAULT_TIMEZONE)
+    if old_start.date() != new_start.date():
+        return False
+    old_words, new_words = title_words(existing["summary"]), title_words(supplement["summary"])
+    if not old_words or not new_words or not (old_words <= new_words or new_words <= old_words):
+        return False
+    return (
+        old_start.time() == time.min or new_start.time() == time.min
+        or abs(old_start - new_start) <= timedelta(hours=1)
+    )
+
+
 def merge_events(events: list[EventRecord], supplements: list[EventRecord]) -> list[EventRecord]:
     merged = list(events)
-    for supplement in supplements:
-        match = None
-        for index, existing in enumerate(merged):
-            if existing["location"] != supplement["location"]:
-                continue
-            old_start = existing["start_at"].astimezone(DEFAULT_TIMEZONE)
-            new_start = supplement["start_at"].astimezone(DEFAULT_TIMEZONE)
-            if old_start.date() != new_start.date():
-                continue
-            old_words, new_words = title_words(existing["summary"]), title_words(supplement["summary"])
-            if not old_words or not new_words or not (old_words <= new_words or new_words <= old_words):
-                continue
-            if old_start.time() != new_start.time() and old_start.time() != time.min and new_start.time() != time.min:
-                continue
-            match = index
-            break
-        if match is None:
+    candidates = [
+        [index for index, existing in enumerate(events) if matching_listing(existing, supplement)]
+        for supplement in supplements
+    ]
+    for supplement, matches in zip(supplements, candidates):
+        # Only reconcile a unique pair across sources. Multiple performances
+        # near one another must remain separate rather than guessing a match.
+        if len(matches) != 1 or sum(matches[0] in other for other in candidates) != 1:
             merged.append(supplement)
-        elif merged[match]["start_at"].astimezone(DEFAULT_TIMEZONE).time() == time.min:
-            # Keep the venue's title, description and URL, but fill missing time.
-            merged[match] = {**merged[match], "start_at": supplement["start_at"]}
+            continue
+        index = matches[0]
+        if supplement["start_at"].astimezone(DEFAULT_TIMEZONE).time() != time.min:
+            # Ticketmaster supplies the scheduled performance time. Preserve
+            # the venue's title, description, URL and any explicit end time.
+            merged[index] = {**merged[index], "start_at": supplement["start_at"]}
     return merged
